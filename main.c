@@ -16,14 +16,14 @@ int create_cs3516_socket() {
     
     sock = socket(AF_INET, SOCK_DGRAM, 0);
 
-    if (sock < 0) error("Error creating CS3516 socket");
+    if (sock < 0) perror("Error creating CS3516 socket");
 
     bzero(&server, sizeof(server));
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
     server.sin_port = htons(MYPORT);
     if (bind(sock, (struct sockaddr *) &server, sizeof(server) ) < 0) 
-        error("Unable to bind CS3516 socket");
+        perror("Unable to bind CS3516 socket");
 
     // Socket is now bound:
     return sock;
@@ -56,4 +56,26 @@ int cs3516_send(int sock, char *buffer, int buff_size, unsigned long nextIP) {
                (struct sockaddr *)&to, tolen);
 
     return n;
+}
+
+int main(int argc, char *argv[]) {
+    int host_flag = 0;
+    int router_flag = 0;
+
+  opterr = 0;
+
+  while ( getopt (argc, argv, "hr:") != -1)
+    switch (c)
+      {
+      case 'h':
+        host_flag = 1;
+        break;
+      case 'r':
+        router_flag = 1;
+        break;
+      default:
+        abort ();
+      }
+
+
 }

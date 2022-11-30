@@ -57,6 +57,23 @@ int cs3516_send(int sock, char *buffer, int buff_size, unsigned long nextIP) {
 }
 
 int main(int argc, char *argv[]) {
-    int sock = create_cs3516_socket();
-    printf("Made socket %d\n", sock);
+    int host_flag = 0;
+    int router_flag = 0;
+
+  opterr = 0;
+
+  while ( getopt (argc, argv, "hr:") != -1)
+    switch (c)
+      {
+      case 'h':
+        host_flag = 1;
+        break;
+      case 'r':
+        router_flag = 1;
+        break;
+      default:
+        abort ();
+      }
+
+
 }

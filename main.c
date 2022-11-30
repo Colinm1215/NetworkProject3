@@ -4,6 +4,8 @@
 #include <netdb.h>
 #include <stdio.h>
 #include <string.h>
+#include <netinet/ip.h>
+#include <netinet/udp.h>
 
 // Set the following port to a unique number:
 #define MYPORT 5950

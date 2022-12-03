@@ -77,11 +77,15 @@ int main(int argc, char *argv[])
     {
     case 'h':
       host_flag = 1;
+      printf("host_flag: %d\n", host_flag);
       break;
     case 'r':
       router_flag = 1;
+      printf("router_flag: %d\n", router_flag);
       break;
     default:
       abort();
     }
+
+
 }

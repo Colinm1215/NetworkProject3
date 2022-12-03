@@ -12,7 +12,7 @@
 // Set the following port to a unique number:
 #define MYPORT 5950
 
-int create_cs3516_socket()
+int create_socket()
 {
   int sock;
   struct sockaddr_in server;
@@ -33,7 +33,7 @@ int create_cs3516_socket()
   return sock;
 }
 
-int cs3516_recv(int sock, char *buffer, int buff_size)
+int recv(int sock, char *buffer, int buff_size)
 {
   struct sockaddr_in from;
   int fromlen, n;
@@ -44,7 +44,7 @@ int cs3516_recv(int sock, char *buffer, int buff_size)
   return n;
 }
 
-int cs3516_send(int sock, char *buffer, int buff_size, unsigned long nextIP)
+int send(int sock, char *buffer, int buff_size, unsigned long nextIP)
 {
   struct sockaddr_in to;
   int tolen, n;
@@ -86,6 +86,10 @@ int main(int argc, char *argv[])
     default:
       abort();
     }
+
+  int sock = 0;
+  sock = create_socket();
+  
 
 
 }

@@ -5,6 +5,8 @@ Lauren Flanagan and Colin Mettler
 Resources Used
 ----------------
 - https://www.gnu.org/software/libc/manual/html_node/Example-of-Getopt.html
+- https://cerebro.cs.wpi.edu/cs3516/cs3516sock.h
+
 
 main.c
 -----------

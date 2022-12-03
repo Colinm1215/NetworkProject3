@@ -62,10 +62,11 @@ int main(int argc, char *argv[]) {
     int host_flag = 0;
     int router_flag = 0;
 
-  opterr = 0;
+    int opterr = 0;
+    int opt;
 
-  while ( getopt (argc, argv, "hr:") != -1)
-    switch (c)
+  while ((opt = getopt (argc, argv, "hr:")) != -1)
+    switch (opt)
       {
       case 'h':
         host_flag = 1;

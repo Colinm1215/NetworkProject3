@@ -87,9 +87,9 @@ int main(int argc, char *argv[])
       abort();
     }
 
-  int sock = 0;
-  sock = create_socket();
-  
+  // int sock = 0;
+  // sock = create_socket();
+
 
 
 }

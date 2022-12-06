@@ -13,6 +13,10 @@
 // Set the following port to a unique number:
 #define MYPORT 5950
 
+int host_flag = 0;
+int router_flag = 0;
+
+
 int create_socket()
 {
   int sock;
@@ -93,7 +97,6 @@ void generate_ip_header(char *src_addr, char *dst_addr, int length, int id, int 
 }
 
 void generate_udp_header(int source_port, int destination_port, int length, void *start_of_udp_hdr) {
-
   ((struct udphdr*)start_of_udp_hdr)->uh_sport = htons(source_port);
   ((struct udphdr*)start_of_udp_hdr)->uh_dport = htons(destination_port);
   ((struct udphdr*)start_of_udp_hdr)->uh_ulen = htons(length);
@@ -102,16 +105,13 @@ void generate_udp_header(int source_port, int destination_port, int length, void
 
 void* generate_packet(char *body, char *source_addr, char *dest_addr, int source_port, int dest_port, int body_len, int id, int ttl) {
   int total_pkt_size = sizeof(struct ip) + sizeof(struct udphdr) + sizeof(char)*body_len;
-  printf("Allocating %d bytes of memory to packet from %d ip hdr, %d udp hdr, and %d body len\n", total_pkt_size, sizeof(struct ip), sizeof(struct udphdr), body_len);
   void *pkt_start = malloc(total_pkt_size);
   void *pkt_working_ptr = pkt_start;
 
-  printf("Generating IP hdr with src_addr %s, dst_addr %s, and total size %d\n", source_addr, dest_addr, total_pkt_size);
   generate_ip_header(source_addr, dest_addr, total_pkt_size, id, ttl, pkt_working_ptr);
 
   pkt_working_ptr = pkt_working_ptr + sizeof(struct ip);
 
-  printf("Generating UDP header with source port %d, destination port %d, and body length %d\n", source_port, dest_port, body_len);
   generate_udp_header(source_port, dest_port, total_pkt_size - sizeof(struct ip), pkt_working_ptr);
 
   pkt_working_ptr  = pkt_working_ptr + sizeof(struct udphdr);
@@ -142,7 +142,7 @@ void print_pkt(void *pkt) {
   pkt = pkt + sizeof(struct udphdr);
   char *body = malloc(sizeof(char)*(len-sizeof(struct udphdr)));
   strcpy(body, (char *)pkt);
-
+  
   printf("ip_hdr_len : %d\n", ip_hdr_len);
   printf("ip_len : %d\n", ip_len);
   printf("ip protocol : %d\n", ip_p);
@@ -163,8 +163,6 @@ void print_pkt(void *pkt) {
 }
 
 int main(int argc, char *argv[]) {
-  int host_flag = 0;
-  int router_flag = 0;
 
   int opterr = 0;
   int opt;
@@ -191,21 +189,35 @@ int main(int argc, char *argv[]) {
   if (router_flag == 1 && host_flag == 1) {
     printf("Usage : %s [-h OR -r]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n", argv[0]);
     exit(1);
-  }
-
-  if (router_flag == 1) {
-
-  } else if (host_flag == 1) {
-    
-  } else {
+  } else if (router_flag == 0 && host_flag == 0) {
     printf("Usage : %s [-h OR -r]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n", argv[0]);
     exit(1);
   }
 
-  char body[] = "This is my body";
-  char *src_addr = "68.178.157.132";
-  char *dst_addr = "255.255.11.135";
-  void *pkt = generate_packet(body, src_addr, dst_addr, 1000, 2000, sizeof(body), 10, 100);
+  int sock = create_socket();
 
-  print_pkt(pkt);
+  if (router_flag == 1) {
+    // make forwarding table
+  }
+
+  if  (host_flag == 1) {
+    // get file and send
+  }
+
+  while (router_flag == 1) {
+    char *buffer = (char *) malloc(sizeof(char)*1000);
+    int returnVal = recv_pkt(sock, buffer, 1000);
+    
+    if (returnVal == -1) {
+      perror("failed");
+      continue;
+    }
+    
+    void *ptr = (void *)buffer;
+
+    ((struct iphdr*)ptr)->ttl--;
+  }
+
+  while (host_flag == 1) {}
+
 }

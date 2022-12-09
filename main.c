@@ -9,6 +9,12 @@
 #include <netinet/udp.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <time.h>
+
+#define TTL_EXPIRED 1
+#define MAX_SENDQ_EXCEEDED 2
+#define NO_ROUTE_TO_HOST 3
+#define SENT_OKAY 4
 
 // Set the following port to a unique number:
 #define MYPORT 5950
@@ -65,43 +71,45 @@ int send_pkt(int sock, char *buffer, int buff_size, unsigned long nextIP)
   return n;
 }
 
-void generate_ip_header(char *src_addr, char *dst_addr, int length, int id, int ttl, void *start_of_ip_hdr) {
-  ((struct ip*)start_of_ip_hdr)->ip_hl = 5;
-  ((struct ip*)start_of_ip_hdr)->ip_len = htons(length);
-  ((struct ip*)start_of_ip_hdr)->ip_p = 17;
-  ((struct ip*)start_of_ip_hdr)->ip_sum = htons(0);
-  ((struct ip*)start_of_ip_hdr)->ip_tos = 0;
-  ((struct ip*)start_of_ip_hdr)->ip_ttl = ttl;
-  ((struct ip*)start_of_ip_hdr)->ip_id = htons(id);
-  ((struct ip*)start_of_ip_hdr)->ip_off = htons(IP_DF);
+void generate_ip_header(char *src_addr, char *dst_addr, int length, int id, int ttl, void *start_of_ip_hdr)
+{
+  ((struct ip *)start_of_ip_hdr)->ip_hl = 5;
+  ((struct ip *)start_of_ip_hdr)->ip_len = htons(length);
+  ((struct ip *)start_of_ip_hdr)->ip_p = 17;
+  ((struct ip *)start_of_ip_hdr)->ip_sum = htons(0);
+  ((struct ip *)start_of_ip_hdr)->ip_tos = 0;
+  ((struct ip *)start_of_ip_hdr)->ip_ttl = ttl;
+  ((struct ip *)start_of_ip_hdr)->ip_id = htons(id);
+  ((struct ip *)start_of_ip_hdr)->ip_off = htons(IP_DF);
 
   struct in_addr src_in_addr;
   int retval;
-   
+
   memset(&src_in_addr, '\0', sizeof(src_in_addr));
   retval = inet_aton(src_addr, &src_in_addr);
 
-  ((struct ip*)start_of_ip_hdr)->ip_src = src_in_addr;
+  ((struct ip *)start_of_ip_hdr)->ip_src = src_in_addr;
 
   struct in_addr dst_in_addr;
-   
+
   memset(&dst_in_addr, '\0', sizeof(dst_in_addr));
   retval = inet_aton(dst_addr, &dst_in_addr);
 
-  ((struct ip*)start_of_ip_hdr)->ip_dst = dst_in_addr;
-
+  ((struct ip *)start_of_ip_hdr)->ip_dst = dst_in_addr;
 }
 
-void generate_udp_header(int source_port, int destination_port, int length, void *start_of_udp_hdr) {
+void generate_udp_header(int source_port, int destination_port, int length, void *start_of_udp_hdr)
+{
 
-  ((struct udphdr*)start_of_udp_hdr)->uh_sport = htons(source_port);
-  ((struct udphdr*)start_of_udp_hdr)->uh_dport = htons(destination_port);
-  ((struct udphdr*)start_of_udp_hdr)->uh_ulen = htons(length);
-  ((struct udphdr*)start_of_udp_hdr)->uh_sum = htons(sizeof(struct udphdr));
+  ((struct udphdr *)start_of_udp_hdr)->uh_sport = htons(source_port);
+  ((struct udphdr *)start_of_udp_hdr)->uh_dport = htons(destination_port);
+  ((struct udphdr *)start_of_udp_hdr)->uh_ulen = htons(length);
+  ((struct udphdr *)start_of_udp_hdr)->uh_sum = htons(sizeof(struct udphdr));
 }
 
-void* generate_packet(char *body, char *source_addr, char *dest_addr, int source_port, int dest_port, int body_len, int id, int ttl) {
-  int total_pkt_size = sizeof(struct ip) + sizeof(struct udphdr) + sizeof(char)*body_len;
+void *generate_packet(char *body, char *source_addr, char *dest_addr, int source_port, int dest_port, int body_len, int id, int ttl)
+{
+  int total_pkt_size = sizeof(struct ip) + sizeof(struct udphdr) + sizeof(char) * body_len;
   printf("Allocating %d bytes of memory to packet from %d ip hdr, %d udp hdr, and %d body len\n", total_pkt_size, sizeof(struct ip), sizeof(struct udphdr), body_len);
   void *pkt_start = malloc(total_pkt_size);
   void *pkt_working_ptr = pkt_start;
@@ -114,33 +122,34 @@ void* generate_packet(char *body, char *source_addr, char *dest_addr, int source
   printf("Generating UDP header with source port %d, destination port %d, and body length %d\n", source_port, dest_port, body_len);
   generate_udp_header(source_port, dest_port, total_pkt_size - sizeof(struct ip), pkt_working_ptr);
 
-  pkt_working_ptr  = pkt_working_ptr + sizeof(struct udphdr);
-  
-  memcpy(pkt_working_ptr, (void *)body, sizeof(char)*body_len);
+  pkt_working_ptr = pkt_working_ptr + sizeof(struct udphdr);
+
+  memcpy(pkt_working_ptr, (void *)body, sizeof(char) * body_len);
 
   return pkt_start;
 }
 
-void print_pkt(void *pkt) {
+void print_pkt(void *pkt)
+{
   char *src_ip = malloc(sizeof(struct in_addr));
   char *dst_ip = malloc(sizeof(struct in_addr));
-  int ip_hdr_len = ((struct ip*)pkt)->ip_hl;
-  int ip_len = ntohs(((struct ip*)pkt)->ip_len);
-  int ip_p = ((struct ip*)pkt)->ip_p;
-  int ip_sum = ntohs(((struct ip*)pkt)->ip_sum);
-  int tos = ((struct ip*)pkt)->ip_tos;
-  int ttl = ((struct ip*)pkt)->ip_ttl;
-  int id = ntohs(((struct ip*)pkt)->ip_id);
-  int frag = ntohs(((struct ip*)pkt)->ip_off);
-  strcpy(src_ip, inet_ntoa(((struct ip*)pkt)->ip_src));
-  strcpy(dst_ip, inet_ntoa(((struct ip*)pkt)->ip_dst));
+  int ip_hdr_len = ((struct ip *)pkt)->ip_hl;
+  int ip_len = ntohs(((struct ip *)pkt)->ip_len);
+  int ip_p = ((struct ip *)pkt)->ip_p;
+  int ip_sum = ntohs(((struct ip *)pkt)->ip_sum);
+  int tos = ((struct ip *)pkt)->ip_tos;
+  int ttl = ((struct ip *)pkt)->ip_ttl;
+  int id = ntohs(((struct ip *)pkt)->ip_id);
+  int frag = ntohs(((struct ip *)pkt)->ip_off);
+  strcpy(src_ip, inet_ntoa(((struct ip *)pkt)->ip_src));
+  strcpy(dst_ip, inet_ntoa(((struct ip *)pkt)->ip_dst));
   pkt = pkt + sizeof(struct ip);
-  int sp = ntohs(((struct udphdr*) pkt)->uh_sport);
-  int dp = ntohs(((struct udphdr*) pkt)->uh_dport);
-  int len = ntohs(((struct udphdr*) pkt)->uh_ulen);
-  int sum = ntohs(((struct udphdr*) pkt)->uh_sum);
+  int sp = ntohs(((struct udphdr *)pkt)->uh_sport);
+  int dp = ntohs(((struct udphdr *)pkt)->uh_dport);
+  int len = ntohs(((struct udphdr *)pkt)->uh_ulen);
+  int sum = ntohs(((struct udphdr *)pkt)->uh_sum);
   pkt = pkt + sizeof(struct udphdr);
-  char *body = malloc(sizeof(char)*(len-sizeof(struct udphdr)));
+  char *body = malloc(sizeof(char) * (len - sizeof(struct udphdr)));
   strcpy(body, (char *)pkt);
 
   printf("ip_hdr_len : %d\n", ip_hdr_len);
@@ -162,42 +171,88 @@ void print_pkt(void *pkt) {
   printf("body : %s\n", pkt);
 }
 
-int main(int argc, char *argv[]) {
+void logger(char *src_overlay_ip, char *dst_overlay_ip, int ip_ident, int status_code, char *next_hop_ip)
+{
+
+  FILE *f;
+  // append message to log file
+  f = fopen("project3.log", "a");
+  if (f == NULL)
+  {
+    printf("-----Log Error-----\n");
+  }
+
+  time_t t = time(NULL);
+  // struct tm tm = *localtime(&t);
+
+  switch (status_code)
+  {
+  case TTL_EXPIRED:
+    fprintf(f, "%ld %s %s %d TTL_EXPIRED\n", t, src_overlay_ip, dst_overlay_ip, ip_ident);
+    break;
+  case MAX_SENDQ_EXCEEDED:
+    fprintf(f, "%ld %s %s %d MAX_SENDQ_EXCEEDED\n", t, src_overlay_ip, dst_overlay_ip, ip_ident);
+    break;
+  case NO_ROUTE_TO_HOST:
+    fprintf(f, "%ld %s %s %d NO_ROUTE_TO_HOST\n", t, src_overlay_ip, dst_overlay_ip, ip_ident);
+    break;
+  case SENT_OKAY:
+    fprintf(f, "%ld %s %s %d SENT_OKAY %s\n", t, src_overlay_ip, dst_overlay_ip, ip_ident, next_hop_ip);
+    break;
+
+  default:
+    fprintf(f, "%ld Error: no status code found.\n", t);
+    fclose(f);
+    return;
+  }
+
+  fclose(f);
+}
+
+int main(int argc, char *argv[])
+{
   int host_flag = 0;
   int router_flag = 0;
 
   int opterr = 0;
   int opt;
 
-  if (argc > 2) {
+  if (argc > 2)
+  {
     printf("Usage : %s [-h OR -r]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n", argv[0]);
     exit(1);
   }
 
-  while ((opt = getopt (argc, argv, "hr")) != -1) {
-    switch (opt) {
-      case 'h':
-        host_flag = 1;
-        break;
-      case 'r':
-        router_flag = 1;
-        break;
-      default:
-        printf("Usage : %s [-h OR -r]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n", argv[0]);
-        exit(1);
-      }
+  while ((opt = getopt(argc, argv, "hr")) != -1)
+  {
+    switch (opt)
+    {
+    case 'h':
+      host_flag = 1;
+      break;
+    case 'r':
+      router_flag = 1;
+      break;
+    default:
+      printf("Usage : %s [-h OR -r]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n", argv[0]);
+      exit(1);
+    }
   }
 
-  if (router_flag == 1 && host_flag == 1) {
+  if (router_flag == 1 && host_flag == 1)
+  {
     printf("Usage : %s [-h OR -r]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n", argv[0]);
     exit(1);
   }
 
-  if (router_flag == 1) {
-
-  } else if (host_flag == 1) {
-    
-  } else {
+  if (router_flag == 1)
+  {
+  }
+  else if (host_flag == 1)
+  {
+  }
+  else
+  {
     printf("Usage : %s [-h OR -r]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n", argv[0]);
     exit(1);
   }

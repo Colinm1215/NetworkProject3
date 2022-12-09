@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <time.h>
+#include <netinet/ether.h>
 
 #define TTL_EXPIRED 1
 #define MAX_SENDQ_EXCEEDED 2
@@ -74,6 +75,8 @@ int send_pkt(int sock, char *buffer, int buff_size, unsigned long nextIP)
 
   return n;
 }
+
+// int drop_pkt(int sock, )
 
 void generate_ip_header(char *src_addr, char *dst_addr, int length, int id, int ttl, void *start_of_ip_hdr)
 {
@@ -175,7 +178,7 @@ void logger(char *src_overlay_ip, char *dst_overlay_ip, int ip_ident, int status
 
   FILE *f;
   // append message to log file
-  f = fopen("project3.log", "a");
+  f = fopen("ROUTER_control.txt", "a");
   if (f == NULL)
   {
     printf("-----Log Error-----\n");
@@ -209,6 +212,8 @@ void logger(char *src_overlay_ip, char *dst_overlay_ip, int ip_ident, int status
 }
 
 int main(int argc, char *argv[]) {
+
+printf("what the heck\n");
 
   int opterr = 0;
   int opt;
@@ -254,7 +259,10 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
+  printf("before create socket\n");
   int sock = create_socket();
+  printf("after create socket\n");
+
   
   if (router_flag == 1) {
     // make forwarding table
@@ -265,15 +273,19 @@ int main(int argc, char *argv[]) {
   }
 
   while (router_flag == 1) {
+    printf("got here 1\n");
     char *buffer = (char *) malloc(sizeof(char)*1000);
+    printf("got here 2\n");
     int returnVal = recv_pkt(sock, buffer, 1000);
-    
+    printf("got here 3\n");
+
     if (returnVal == -1) {
       perror("failed");
       continue;
     }
     
-    void *ptr = (void *)buffer;
+    void *ptr = ((void *) buffer) + sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct udphdr);
+    print_pkt(ptr);
 
     ((struct iphdr*)ptr)->ttl--;
   }

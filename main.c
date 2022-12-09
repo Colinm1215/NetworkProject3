@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <time.h>
+#include <netinet/ether.h>
 
 #define TTL_EXPIRED 1
 #define MAX_SENDQ_EXCEEDED 2
@@ -55,7 +56,7 @@ int recv_pkt(int sock, char *buffer, int buff_size)
   return n;
 }
 
-int send_pkt(int sock, char *buffer, int buff_size, unsigned long nextIP)
+int send_pkt(int sock, char *buffer, int buff_size, int port, unsigned long nextIP)
 {
   struct sockaddr_in to;
   int tolen, n;
@@ -65,7 +66,7 @@ int send_pkt(int sock, char *buffer, int buff_size, unsigned long nextIP)
   // Okay, we must populate the to structure.
   bzero(&to, sizeof(to));
   to.sin_family = AF_INET;
-  to.sin_port = htons(my_port);
+  to.sin_port = htons(port);
   to.sin_addr.s_addr = nextIP;
 
   // We can now send to this destination:
@@ -266,18 +267,34 @@ int main(int argc, char *argv[]) {
 
   while (router_flag == 1) {
     char *buffer = (char *) malloc(sizeof(char)*1000);
+    printf("Looking\n");
     int returnVal = recv_pkt(sock, buffer, 1000);
+    printf("Recieved %d : %s\n", returnVal, buffer);
+    void *ptr = ((void *) buffer) + sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct udphdr);
+    print_pkt(ptr);
     
     if (returnVal == -1) {
       perror("failed");
       continue;
     }
-    
-    void *ptr = (void *)buffer;
 
     ((struct iphdr*)ptr)->ttl--;
   }
 
-  while (host_flag == 1) {}
+int count = 0;
+  while (host_flag == 1 && count < 1) {
+    char *message = "According to all known laws of aviation, there is no way a bee should be able to fly. It's wings are too small to get its fat little body off the ground";
+    void *pkt = generate_packet(message, my_addr, "192.168.153.1", 1024, 1025, strlen(message), 0, 10);
+    printf("Sending : %s", pkt);
+    struct in_addr antelope;
+char *some_addr;
+//print_pkt(pkt);
+// 192.168.153.255 ./main -h -i 130.215.169.168 -p 1024
+//inet_aton("127.0.0.1", &antelope);
+int val = inet_pton(AF_INET, "192.168.153.1", &antelope);
+    printf("Sending : %s", pkt);
+    send_pkt(sock, pkt, sizeof(struct ip) + sizeof(struct udphdr) + strlen(message), 1025, antelope.s_addr); 
+    count++;
+  }
 
 }

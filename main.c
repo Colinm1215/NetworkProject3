@@ -166,7 +166,7 @@ void print_pkt(void *pkt)
   printf("len : %d\n", len);
   printf("sum : %d\n", sum);
 
-  printf("body : %s\n", pkt);
+  printf("body : %s\n", (char *)pkt);
 }
 
 

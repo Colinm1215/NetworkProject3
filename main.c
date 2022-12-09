@@ -16,9 +16,8 @@
 #define NO_ROUTE_TO_HOST 3
 #define SENT_OKAY 4
 
-// Set the following port to a unique number:
-#define MYPORT 5950
-
+int my_port = 0;
+char *my_addr = "";
 int host_flag = 0;
 int router_flag = 0;
 
@@ -36,7 +35,8 @@ int create_socket()
   bzero(&server, sizeof(server));
   server.sin_family = AF_INET;
   server.sin_addr.s_addr = INADDR_ANY;
-  server.sin_port = htons(MYPORT);
+  server.sin_port = htons(my_port);
+  inet_aton(my_addr, &server.sin_addr);
   if (bind(sock, (struct sockaddr *)&server, sizeof(server)) < 0)
     perror("Unable to bind CS3516 socket");
 
@@ -65,7 +65,7 @@ int send_pkt(int sock, char *buffer, int buff_size, unsigned long nextIP)
   // Okay, we must populate the to structure.
   bzero(&to, sizeof(to));
   to.sin_family = AF_INET;
-  to.sin_port = htons(MYPORT);
+  to.sin_port = htons(my_port);
   to.sin_addr.s_addr = nextIP;
 
   // We can now send to this destination:
@@ -213,39 +213,49 @@ int main(int argc, char *argv[]) {
   int opterr = 0;
   int opt;
 
-  if (argc > 2)
-  {
-    printf("Usage : %s [-h OR -r]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n", argv[0]);
-    exit(1);
+  while ((opt = getopt (argc, argv, "hri:p:")) != -1) {
+    switch (opt) {
+      case 'h':
+        host_flag = 1;
+        break;
+      case 'r':
+        router_flag = 1;
+        break;
+      case 'i':
+        if (optarg[0] != "-") {
+          my_addr = (char *) malloc(sizeof(char)*strlen(optarg));
+          strcpy(my_addr, optarg);
+        } else {
+          printf("IP argument is not a valid address\n");
+          printf("Usage : %s [-h OR -r] [-i Address] [-p Port]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n-i indicates the IP address, and -p indicates the port", argv[0]);
+          exit(1);
+        }
+        break;
+      case 'p':
+        if (optarg[0] != "-") {
+          my_port = atoi(optarg);
+        } else {
+          printf("Port argument is not a valid port\n");
+          printf("Usage : %s [-h OR -r] [-i Address] [-p Port]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n-i indicates the IP address, and -p indicates the port", argv[0]);
+          exit(1);
+        }
+        break;
+      default:
+        printf("Usage : %s [-h OR -r] [-i Address] [-p Port]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n-i indicates the IP address, and -p indicates the port", argv[0]);
+        exit(1);
+      }
   }
 
-  while ((opt = getopt(argc, argv, "hr")) != -1)
-  {
-    switch (opt)
-    {
-    case 'h':
-      host_flag = 1;
-      break;
-    case 'r':
-      router_flag = 1;
-      break;
-    default:
-      printf("Usage : %s [-h OR -r]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n", argv[0]);
-      exit(1);
-    }
-  }
-
-  if (router_flag == 1 && host_flag == 1)
-  {
-    printf("Usage : %s [-h OR -r]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n", argv[0]);
+  if (router_flag == 1 && host_flag == 1) {
+    printf("Usage : %s [-h OR -r] [-i Address] [-p Port]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n-i indicates the IP address, and -p indicates the port", argv[0]);
     exit(1);
   } else if (router_flag == 0 && host_flag == 0) {
-    printf("Usage : %s [-h OR -r]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n", argv[0]);
+    printf("Usage : %s [-h OR -r] [-i Address] [-p Port]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n-i indicates the IP address, and -p indicates the port", argv[0]);
     exit(1);
   }
 
   int sock = create_socket();
-
+  
   if (router_flag == 1) {
     // make forwarding table
   }

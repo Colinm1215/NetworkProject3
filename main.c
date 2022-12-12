@@ -1,27 +1,13 @@
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <stdio.h>
-#include <string.h>
-#include <netinet/ip.h>
-#include <netinet/udp.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <time.h>
-#include <netinet/ether.h>
+#include "main.h"
 
-#define TTL_EXPIRED 1
-#define MAX_SENDQ_EXCEEDED 2
-#define NO_ROUTE_TO_HOST 3
-#define SENT_OKAY 4
-
-int my_port = 0;
-char *my_addr = "";
+int my_port = 1000;
+int my_id = -1;
+char *my_addr;
+char *my_overlay_addr;
 int host_flag = 0;
 int router_flag = 0;
-
+int queue_length = 0;
+int ttl_value = 0;
 
 int create_socket()
 {
@@ -125,15 +111,15 @@ void* generate_packet(char *body, char *source_addr, char *dest_addr, int source
 
   pkt_working_ptr = pkt_working_ptr + sizeof(struct udphdr);
 
-  memcpy(pkt_working_ptr, (void *)body, sizeof(char) * body_len);
+  strncpy((char *)pkt_working_ptr, body, strlen(body));
 
   return pkt_start;
 }
 
 void print_pkt(void *pkt)
 {
-  char *src_ip = malloc(sizeof(struct in_addr));
-  char *dst_ip = malloc(sizeof(struct in_addr));
+  char *src_ip = (char *)malloc(sizeof(struct in_addr));
+  char *dst_ip = (char *)malloc(sizeof(struct in_addr));
   int ip_hdr_len = ((struct ip *)pkt)->ip_hl;
   int ip_len = ntohs(((struct ip *)pkt)->ip_len);
   int ip_p = ((struct ip *)pkt)->ip_p;
@@ -150,8 +136,10 @@ void print_pkt(void *pkt)
   int len = ntohs(((struct udphdr *)pkt)->uh_ulen);
   int sum = ntohs(((struct udphdr *)pkt)->uh_sum);
   pkt = pkt + sizeof(struct udphdr);
-  char *body = malloc(sizeof(char) * (len - sizeof(struct udphdr)));
-  strcpy(body, (char *)pkt);
+  int s = sizeof(char) * ((len) - sizeof(struct udphdr));
+  char body[s+1];
+  body[s] = '\0';
+  strncpy(body, (char *)pkt, s);
   
   printf("ip_hdr_len : %d\n", ip_hdr_len);
   printf("ip_len : %d\n", ip_len);
@@ -169,7 +157,9 @@ void print_pkt(void *pkt)
   printf("len : %d\n", len);
   printf("sum : %d\n", sum);
 
-  printf("body : %s\n", (char *)pkt);
+  printf("body : %s\n", body);
+  free(src_ip);
+  free(dst_ip);
 }
 
 
@@ -211,28 +201,141 @@ void logger(char *src_overlay_ip, char *dst_overlay_ip, int ip_ident, int status
   fclose(f);
 }
 
-int main(int argc, char *argv[]) {
+int do_global_config(int pos, char *str) {
+  switch (pos) {
+    case 0:
+      queue_length = atoi(str);
+      return 1;
+    case 1:
+      ttl_value = atoi(str);
+      return 1;
+  }
+}
 
-printf("what the heck\n");
+
+int do_router_config(int pos, char *str) {
+  switch (pos) {
+    case 0:
+      int line_id = atoi(str);
+      if (line_id == my_id) router_flag = 1;
+      return ((line_id == my_id) ? 1 : 0);
+    case 1:
+      my_addr = (char *)malloc(sizeof(char)*strlen(str));
+      strncpy(my_addr, str, strlen(str)-2);
+      return 1;
+  }   
+}
+
+int do_host_config(int pos, char *str) {
+  switch (pos) {
+    case 0:
+      int line_id = atoi(str);
+      if (line_id == my_id) host_flag = 1;
+      return ((line_id == my_id) ? 1 : 0);
+    case 1:
+      my_addr = (char *)malloc(sizeof(char)*strlen(str));
+      strncpy(my_addr, str, strlen(str));
+      return 1;
+    case 2:
+      my_overlay_addr = (char *)malloc(sizeof(char)*strlen(str));
+      strncpy(my_overlay_addr, str, strlen(str)-2);
+      return 1;
+  }
+}
+
+int do_router_link_config(int pos, char *str) {
+  
+}
+
+int do_host_link_config(int pos, char *str) {
+  
+}
+
+void read_configuration_file(FILE* fp) {
+  char *line = NULL;
+  size_t len = 0;
+  ssize_t read;
+
+  while ((read = getline(&line, &len, fp)) != -1) {
+    int line_applicable = 0;
+    int flag = ((int)line[0]-'0')+5;
+    strcpy(line, line + 2);
+	  char delim[] = " ";
+
+	  char *ptr = strtok(line, delim);
+    int pos = 0;
+
+	  while (ptr != NULL)
+	  {
+      if (pos > 0 && line_applicable == 0) break;
+      switch (flag) {
+        case GLOBAL_CONFIG:
+          line_applicable = do_global_config(pos, ptr);
+          break;
+        case ROUTER_CONFIG:
+          line_applicable = do_router_config(pos, ptr);
+          break;
+        case HOST_CONFIG:
+          line_applicable = do_host_config(pos, ptr);
+          break;
+        case ROUTER_TO_ROUTER_LINK:
+          line_applicable = do_router_link_config(pos, ptr);
+          break;
+        case ROUTER_TO_HOST_LINK:
+          line_applicable = do_host_link_config(pos, ptr);
+          break;
+      }
+      pos++;
+		  ptr = strtok(NULL, delim);
+	  }
+
+  }
+
+  printf("Queue Value - %d\nTTL Val - %d\n", queue_length, ttl_value);
+  printf("Router_Flag : %d\nHost_Flag : %d\n", router_flag, host_flag);
+  printf("Address : %s:%d\n", my_addr, my_port);
+  if (host_flag == 1) {
+  printf("Overlay Address : %s\n", my_overlay_addr);
+  }
+
+  fclose(fp);
+  if (line) free(line);
+}
+
+int main(int argc, char *argv[]) {
 
   int opterr = 0;
   int opt;
+  int n = 10;
+  char arg_err[1000];   // Use an array which is large enough 
+  snprintf(arg_err, sizeof(arg_err), "Usage : %s [-i ID] [-p Port] [-f FILENAME]\n-i indicates the machine ID\n-p indicates the port\n-f is the filename of the configuration file\n", argv[0]);
 
-  while ((opt = getopt (argc, argv, "hri:p:")) != -1) {
+  while ((opt = getopt (argc, argv, "i:p:f:")) != -1) {
     switch (opt) {
-      case 'h':
-        host_flag = 1;
-        break;
-      case 'r':
-        router_flag = 1;
+      case 'f':
+        if (optarg[0] != "-") {
+          FILE * fp;
+          char *file_name = (char *) malloc(sizeof(char)*strlen(optarg));
+          strcpy(file_name, optarg);
+          fp = fopen(file_name, "r");
+          if (fp == NULL) {
+            printf("Not a valid filename\n"); 
+            printf("%s", arg_err);
+            exit(1);
+          }
+          read_configuration_file(fp);
+        } else {
+          printf("Not a valid filename\n");
+          printf("%s", arg_err);
+          exit(1);
+        }
         break;
       case 'i':
         if (optarg[0] != "-") {
-          my_addr = (char *) malloc(sizeof(char)*strlen(optarg));
-          strcpy(my_addr, optarg);
+          my_id = atoi(optarg);
         } else {
-          printf("IP argument is not a valid address\n");
-          printf("Usage : %s [-h OR -r] [-i Address] [-p Port]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n-i indicates the IP address, and -p indicates the port", argv[0]);
+          printf("Invalid ID Number\n");
+          printf("%s", arg_err);
           exit(1);
         }
         break;
@@ -241,27 +344,25 @@ printf("what the heck\n");
           my_port = atoi(optarg);
         } else {
           printf("Port argument is not a valid port\n");
-          printf("Usage : %s [-h OR -r] [-i Address] [-p Port]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n-i indicates the IP address, and -p indicates the port", argv[0]);
+          printf("%s", arg_err);
           exit(1);
         }
         break;
       default:
-        printf("Usage : %s [-h OR -r] [-i Address] [-p Port]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n-i indicates the IP address, and -p indicates the port", argv[0]);
+          printf("%s", arg_err);
         exit(1);
       }
   }
 
   if (router_flag == 1 && host_flag == 1) {
-    printf("Usage : %s [-h OR -r] [-i Address] [-p Port]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n-i indicates the IP address, and -p indicates the port", argv[0]);
+    printf("Host/Router Identification Failed!\nSet to both Host and Router\n");
     exit(1);
   } else if (router_flag == 0 && host_flag == 0) {
-    printf("Usage : %s [-h OR -r] [-i Address] [-p Port]\nWherein -h indicates a host configuration and a -r indicates a router configuration\nOnly one may be used\n-i indicates the IP address, and -p indicates the port", argv[0]);
+    printf("Host/Router Identification Failed!\nSet to neither Host nor Router\n");
     exit(1);
   }
 
-  printf("before create socket\n");
   int sock = create_socket();
-  printf("after create socket\n");
 
   
   if (router_flag == 1) {
@@ -273,36 +374,38 @@ printf("what the heck\n");
   }
 
   while (router_flag == 1) {
-    printf("got here 1\n");
+    printf("Reading\n");
     char *buffer = (char *) malloc(sizeof(char)*1000);
-    printf("got here 2\n");
     int returnVal = recv_pkt(sock, buffer, 1000);
-    printf("got here 3\n");
+    printf("Read %d bytes\n", returnVal);
 
     if (returnVal == -1) {
       perror("failed");
       continue;
     }
     
-    void *ptr = ((void *) buffer) + sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct udphdr);
+    void *ptr = ((void *) buffer);
     print_pkt(ptr);
 
     ((struct iphdr*)ptr)->ttl--;
+    free(buffer);
   }
 
 int count = 0;
   while (host_flag == 1 && count < 1) {
     char *message = "According to all known laws of aviation, there is no way a bee should be able to fly. It's wings are too small to get its fat little body off the ground";
-    void *pkt = generate_packet(message, my_addr, "192.168.153.1", 1024, 1025, strlen(message), 0, 10);
-    printf("Sending : %s", pkt);
+    void *pkt = generate_packet(message, my_addr, "127.0.0.1", 1025, 1024, strlen(message), 0, ttl_value);
     struct in_addr antelope;
-char *some_addr;
-//print_pkt(pkt);
-// 192.168.153.255 ./main -h -i 130.215.169.168 -p 1024
-//inet_aton("127.0.0.1", &antelope);
-int val = inet_pton(AF_INET, "192.168.153.1", &antelope);
-    printf("Sending : %s", pkt);
-    send_pkt(sock, pkt, sizeof(struct ip) + sizeof(struct udphdr) + strlen(message), 1025, antelope.s_addr); 
+    char *some_addr;
+    //print_pkt(pkt);
+    // 192.168.153.255 ./main -h -i 130.215.169.168 -p 1024
+    //inet_aton("127.0.0.1", &antelope);
+    int val = inet_pton(AF_INET, "127.0.0.1", &antelope);
+    printf("Sending :\n");
+    print_pkt(pkt);
+    int returnVal = send_pkt(sock, (char *)pkt, sizeof(struct ip) + sizeof(struct udphdr) + strlen(message), 1024, antelope.s_addr);
+    free(pkt);
+    printf("Send %d bytes\n", returnVal);
     count++;
   }
 

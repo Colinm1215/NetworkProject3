@@ -1,5 +1,12 @@
 #include "main.h"
 
+struct Queue {
+  char *pkts[MAX_QUEUE_LEN];
+  int len;
+  char *head;
+  char *tail;
+};
+
 int my_port = 1000;
 int my_id = -1;
 char *my_addr;
@@ -161,6 +168,34 @@ void print_pkt(void *pkt)
   free(src_ip);
   free(dst_ip);
 }
+
+/*
+// DROP-TAIL QUEUING
+int droptail_enqueue(struct Queue *queue, char *pkt){
+  
+  // drop packet when droptail queue is already full
+  if(queue->len == MAX_QUEUE_LEN){
+    return 0; // queue already full
+  }
+  queue->pkts[queue->tail] = pkt;
+  queue->tail = (queue->tail + 1) % MAX_QUEUE_LEN; // not sure
+  queue->len++;
+  return 1; // successful enqueue
+}
+
+int droptail_dequeue(struct Queue *queue){
+
+  // when droptail queue is empty
+  if(queue->len == 0){
+    return 0; // empty queue
+  }
+  char *pkt = queue->pkts[queue->head];
+  queue->head = (queue->head + 1) % MAX_QUEUE_LEN;
+  queue->len--;
+  return 1; // successful dequeue
+}
+
+*/
 
 
 void logger(char *src_overlay_ip, char *dst_overlay_ip, int ip_ident, int status_code, char *next_hop_ip)
@@ -388,6 +423,16 @@ int main(int argc, char *argv[]) {
     print_pkt(ptr);
 
     ((struct iphdr*)ptr)->ttl--;
+
+    // drops packet (ignores) and logs when TTL value is zero
+    if(((struct iphdr*)ptr)->ttl == 0){
+      // logger(src_overlay_ip, dst_overlay_ip, ip_ident, TTL_EXPIRED, NULL);
+      free(buffer);
+      continue;
+    }
+
+    // TODO: send packet along to next router
+
     free(buffer);
   }
 

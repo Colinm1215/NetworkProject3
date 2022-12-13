@@ -27,6 +27,8 @@
 #define ROUTER_TO_ROUTER_LINK 8
 #define ROUTER_TO_HOST_LINK 9
 
+#define MAX_QUEUE_LEN 10
+
 int create_socket();
 int main(int argc, char *argv[]);
 int recv_pkt(int sock, char *buffer, int buff_size);

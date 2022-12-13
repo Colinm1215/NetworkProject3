@@ -6,7 +6,9 @@ Resources Used
 ----------------
 - https://www.gnu.org/software/libc/manual/html_node/Example-of-Getopt.html
 - https://cerebro.cs.wpi.edu/cs3516/cs3516sock.h
-
+- https://stackoverflow.com/questions/1113033/c-declaring-array-of-char
+- https://www.geeksforgeeks.org/longest-prefix-matching-in-routers/
+- 
 
 main.c
 -----------

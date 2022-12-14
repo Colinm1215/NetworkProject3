@@ -1,12 +1,5 @@
 #include "main.h"
 
-struct Queue {
-  char *pkts[MAX_QUEUE_LEN];
-  int len;
-  char *head;
-  char *tail;
-};
-
 int my_port = 1000;
 int my_id = -1;
 char *my_addr;
@@ -15,6 +8,13 @@ int host_flag = 0;
 int router_flag = 0;
 int queue_length = 0;
 int ttl_value = 0;
+
+struct Queue {
+  char pkts[MAX_QUEUE_LEN][1000];
+  int len;
+  int head;
+  int tail;
+};
 
 int create_socket()
 {
@@ -169,7 +169,8 @@ void print_pkt(void *pkt)
   free(dst_ip);
 }
 
-/*
+// pkt payload max 1000
+
 // DROP-TAIL QUEUING
 int droptail_enqueue(struct Queue *queue, char *pkt){
   
@@ -177,25 +178,27 @@ int droptail_enqueue(struct Queue *queue, char *pkt){
   if(queue->len == MAX_QUEUE_LEN){
     return 0; // queue already full
   }
-  queue->pkts[queue->tail] = pkt;
-  queue->tail = (queue->tail + 1) % MAX_QUEUE_LEN; // not sure
+  strcpy(queue->pkts[queue->tail], pkt);
+  queue->tail = (queue->tail + 1) % MAX_QUEUE_LEN;
   queue->len++;
-  return 1; // successful enqueue
+  return 1; // enqueue successful
 }
 
-int droptail_dequeue(struct Queue *queue){
+int droptail_dequeue(struct Queue *queue, char *pkt){
 
+  pkt = (char *) malloc(sizeof(char)*1000);
   // when droptail queue is empty
   if(queue->len == 0){
     return 0; // empty queue
   }
-  char *pkt = queue->pkts[queue->head];
+  strcpy(pkt, queue->pkts[queue->head]);
+  // queue->pkts[queue->head] = '\0';
+  memset(queue->pkts[queue->head], '\0', 1000);
   queue->head = (queue->head + 1) % MAX_QUEUE_LEN;
   queue->len--;
-  return 1; // successful dequeue
+  return 1; // dequeue successful
 }
 
-*/
 
 
 void logger(char *src_overlay_ip, char *dst_overlay_ip, int ip_ident, int status_code, char *next_hop_ip)

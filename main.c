@@ -7,7 +7,7 @@ struct Queue {
   char *tail;
 };
 
-int my_port = 1000;
+int my_port = 5000;
 int my_id = -1;
 char *my_addr;
 char *my_overlay_addr;
@@ -15,6 +15,7 @@ int host_flag = 0;
 int router_flag = 0;
 int queue_length = 0;
 int ttl_value = 0;
+
 
 int create_socket()
 {
@@ -28,7 +29,6 @@ int create_socket()
 
   bzero(&server, sizeof(server));
   server.sin_family = AF_INET;
-  server.sin_addr.s_addr = INADDR_ANY;
   server.sin_port = htons(my_port);
   inet_aton(my_addr, &server.sin_addr);
   if (bind(sock, (struct sockaddr *)&server, sizeof(server)) < 0)
@@ -236,53 +236,97 @@ void logger(char *src_overlay_ip, char *dst_overlay_ip, int ip_ident, int status
   fclose(f);
 }
 
-int do_global_config(int pos, char *str) {
-  switch (pos) {
-    case 0:
-      queue_length = atoi(str);
-      return 1;
-    case 1:
-      ttl_value = atoi(str);
-      return 1;
+void do_global_config(int pos, char *str) {
+  char delim[] = " ";
+
+	char *ptr = strtok(str, delim);
+  int pos = 0;
+
+	while (ptr != NULL) {
+    switch (pos) {
+      case 0:
+        queue_length = atoi(ptr);
+        return 1;
+      case 1:
+        ttl_value = atoi(ptr);
+        return 1;
+    }
+    pos++;
+		ptr = strtok(NULL, delim);
   }
 }
 
 
-int do_router_config(int pos, char *str) {
-  switch (pos) {
-    case 0:
-      int line_id = atoi(str);
-      if (line_id == my_id) router_flag = 1;
-      return ((line_id == my_id) ? 1 : 0);
-    case 1:
-      my_addr = (char *)malloc(sizeof(char)*strlen(str));
-      strncpy(my_addr, str, strlen(str)-2);
-      return 1;
-  }   
-}
+void do_router_config(char *str, struct General_Node *all_routers) {
+  char delim[] = " ";
 
-int do_host_config(int pos, char *str) {
-  switch (pos) {
-    case 0:
-      int line_id = atoi(str);
-      if (line_id == my_id) host_flag = 1;
-      return ((line_id == my_id) ? 1 : 0);
-    case 1:
-      my_addr = (char *)malloc(sizeof(char)*strlen(str));
-      strncpy(my_addr, str, strlen(str));
-      return 1;
-    case 2:
-      my_overlay_addr = (char *)malloc(sizeof(char)*strlen(str));
-      strncpy(my_overlay_addr, str, strlen(str)-2);
-      return 1;
+	char *ptr = strtok(str, delim);
+  int pos = 0;
+
+	while (ptr != NULL) {
+    switch (pos) {
+      case 0:
+        if (atoi(ptr) == my_id) router_flag = 1;
+      case 1:
+        my_addr = (char *)malloc(sizeof(char)*strlen(ptr));
+        strncpy(my_addr, ptr, strlen(ptr)-2);
+        int cur_i = 0;
+        while (all_routers != NULL) {
+          all_routers = all_routers->next;
+          cur_i++;
+        }
+        all_routers = (struct General_Node*) (malloc(sizeof(struct General_Node)));
+        all_routers->pos = cur_i;
+        strcpy(all_routers->data, my_addr);
+    }
+    pos++;
+		ptr = strtok(NULL, delim);
   }
 }
 
-int do_router_link_config(int pos, char *str) {
-  
+void do_host_config(char *str) {
+  char delim[] = " ";
+
+	char *ptr = strtok(str, delim);
+  int pos = 0;
+
+	while (ptr != NULL) {
+    switch (pos) {
+      case 0:
+        if (atoi(ptr) == my_id) host_flag = 1;
+        return ((atoi(ptr) == my_id) ? 1 : 0);
+      case 1:
+        my_addr = (char *)malloc(sizeof(char)*strlen(ptr));
+        strncpy(my_addr, ptr, strlen(str));
+        return 1;
+      case 2:
+        my_overlay_addr = (char *)malloc(sizeof(char)*strlen(ptr));
+        strncpy(my_overlay_addr, ptr, strlen(ptr)-2);
+        return 1;
+    }
+    pos++;
+		ptr = strtok(NULL, delim);
+  }
 }
 
-int do_host_link_config(int pos, char *str) {
+void do_router_link_config(char *str) {
+  if (router_flag == 0) return 0;
+  char delim[] = " ";
+
+	char *ptr = strtok(str, delim);
+  int pos = 0;
+
+	while (ptr != NULL) {
+      switch (pos) {
+        case 0:
+
+      }
+      pos++;
+		  ptr = strtok(NULL, delim);
+  }
+}
+
+int do_host_link_config(char *str) {
   
 }
 
@@ -290,40 +334,30 @@ void read_configuration_file(FILE* fp) {
   char *line = NULL;
   size_t len = 0;
   ssize_t read;
+  struct General_Node *all_routers = NULL;
+  struct General_Node *all_hosts = NULL;
 
   while ((read = getline(&line, &len, fp)) != -1) {
-    int line_applicable = 0;
     int flag = ((int)line[0]-'0')+5;
     strcpy(line, line + 2);
-	  char delim[] = " ";
 
-	  char *ptr = strtok(line, delim);
-    int pos = 0;
-
-	  while (ptr != NULL)
-	  {
-      if (pos > 0 && line_applicable == 0) break;
-      switch (flag) {
+    switch (flag) {
         case GLOBAL_CONFIG:
-          line_applicable = do_global_config(pos, ptr);
+          do_global_config(line);
           break;
         case ROUTER_CONFIG:
-          line_applicable = do_router_config(pos, ptr);
+          do_router_config(line, all_routers);
           break;
         case HOST_CONFIG:
-          line_applicable = do_host_config(pos, ptr);
+          do_host_config(line, all_hosts);
           break;
         case ROUTER_TO_ROUTER_LINK:
-          line_applicable = do_router_link_config(pos, ptr);
+          do_router_link_config(line, all_routers);
           break;
         case ROUTER_TO_HOST_LINK:
-          line_applicable = do_host_link_config(pos, ptr);
+          do_host_link_config(line, all_routers, all_hosts);
           break;
       }
-      pos++;
-		  ptr = strtok(NULL, delim);
-	  }
-
   }
 
   printf("Queue Value - %d\nTTL Val - %d\n", queue_length, ttl_value);
@@ -338,7 +372,13 @@ void read_configuration_file(FILE* fp) {
 }
 
 int main(int argc, char *argv[]) {
-
+/*
+    struct in_addr tip;
+    int val = inet_pton(AF_INET, "6.5.4.1", &tip);
+    char *src_ip = (char *)malloc(sizeof(struct in_addr));
+    tip.s_addr = (tip.s_addr & SUBNET_MASK(24));
+  strcpy(src_ip, inet_ntoa(tip));
+  */
   int opterr = 0;
   int opt;
   int n = 10;
@@ -399,11 +439,6 @@ int main(int argc, char *argv[]) {
 
   int sock = create_socket();
 
-  
-  if (router_flag == 1) {
-    // make forwarding table
-  }
-
   if  (host_flag == 1) {
     // get file and send
   }
@@ -436,19 +471,16 @@ int main(int argc, char *argv[]) {
     free(buffer);
   }
 
-int count = 0;
+  int count = 0;
   while (host_flag == 1 && count < 1) {
     char *message = "According to all known laws of aviation, there is no way a bee should be able to fly. It's wings are too small to get its fat little body off the ground";
-    void *pkt = generate_packet(message, my_addr, "127.0.0.1", 1025, 1024, strlen(message), 0, ttl_value);
-    struct in_addr antelope;
+    void *pkt = generate_packet(message, my_addr, "10.63.35.1", 8135, 8134, strlen(message), 0, ttl_value);
+    struct in_addr dest_ip;
     char *some_addr;
-    //print_pkt(pkt);
-    // 192.168.153.255 ./main -h -i 130.215.169.168 -p 1024
-    //inet_aton("127.0.0.1", &antelope);
-    int val = inet_pton(AF_INET, "127.0.0.1", &antelope);
+    int val = inet_pton(AF_INET, "10.63.35.1", &dest_ip);
     printf("Sending :\n");
     print_pkt(pkt);
-    int returnVal = send_pkt(sock, (char *)pkt, sizeof(struct ip) + sizeof(struct udphdr) + strlen(message), 1024, antelope.s_addr);
+    int returnVal = send_pkt(sock, (char *)pkt, sizeof(struct ip) + sizeof(struct udphdr) + strlen(message), 8134, dest_ip.s_addr);
     free(pkt);
     printf("Send %d bytes\n", returnVal);
     count++;

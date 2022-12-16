@@ -18,6 +18,7 @@ struct Router_Node {
   char *addr;
   int id;
   int delay_with_router;
+  time_t send_pkt_last;
   struct Router_Node *next;
 };
 

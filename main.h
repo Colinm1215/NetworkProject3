@@ -44,6 +44,7 @@ void do_host_config(char *str);
 void do_router_link_config(char *str);
 void do_host_link_config(char *str);
 void* generate_packet(char *body, char *source_addr, char *dest_addr, int source_port, int dest_port, int body_len, int id, int ttl);
+char* get_next_hop(char* dest_overlay_ip);
 
 
 #endif

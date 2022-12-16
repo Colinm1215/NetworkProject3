@@ -8,7 +8,10 @@ Resources Used
 - https://cerebro.cs.wpi.edu/cs3516/cs3516sock.h
 - https://stackoverflow.com/questions/1113033/c-declaring-array-of-char
 - https://www.geeksforgeeks.org/longest-prefix-matching-in-routers/
-- 
+- https://www.geeksforgeeks.org/examples-on-udp-header/
+- https://stackoverflow.com/questions/1829187/udp-sockets-in-c
+- https://www.guru99.com/ip-header.html
+- https://www.tutorialspoint.com/c_standard_library/c_function_difftime.htm
 
 main.c
 -----------

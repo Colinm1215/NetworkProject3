@@ -267,24 +267,41 @@ void do_global_config(char *str) {
 
 void do_router_config(char *str) {
   char delim[] = " ";
-  struct Router_Node *head = all_routers;
+  struct Router_Node *head;
+  if (all_routers == NULL) {
+    all_routers = (struct Router_Node*) (malloc(sizeof(struct Router_Node)));
+    all_routers->next = NULL;
+    head = all_routers;
+  } else {
+    head = all_routers;
+    while (head->next != NULL) {
+      head = head->next;
+    }
+    head->next = (struct Router_Node*) (malloc(sizeof(struct Router_Node)));
+    head = head->next;
+    head->next = NULL;
+  }
 
-	char *ptr = strtok(str, delim);
+  char *ptr = strtok(str, delim);
   int pos = 0;
 
-	while (ptr != NULL) {
+    while (ptr != NULL) {
+    char buffer[strlen(ptr)];
+    strcpy(buffer, ptr);
+    if (pos == 2) {
+      buffer[strcspn(buffer, "\n")-1] = 0;
+    }
     switch (pos) {
+
       case 0:
+        head->id = atoi(ptr);
+        head->send_pkt_last = -1;
         if (atoi(ptr) == my_id) {
-          while (head != NULL) {
-            head = head->next;
-          }
-          head = (struct Router_Node*) (malloc(sizeof(struct Router_Node)));
-          head->id = atoi(ptr);
           router_flag = 1;
           break;
         }
         else return;
+
       case 1:
         if (head->id == my_id) {
           my_addr = (char *)malloc(sizeof(char)*strlen(ptr));
@@ -296,9 +313,10 @@ void do_router_config(char *str) {
         break;
     }
     pos++;
-		ptr = strtok(NULL, delim);
+    ptr = strtok(NULL, delim);
   }
 }
+
 
 void do_host_config(char *str) {
   char delim[] = " ";
@@ -427,7 +445,7 @@ void do_host_link_config(char *str) {
         case 1:
           first_delay = atoi(ptr);
           break;
-        case 2:
+        case 2: ;
           char *str = strtok(ptr, "/");
           prefix_addr = (char *)malloc(sizeof(char)*strlen(str));
           strcpy(prefix_addr, str);
@@ -510,6 +528,8 @@ void read_configuration_file(FILE* fp) {
   fclose(fp);
   if (line) free(line);
 }
+
+// 
 
 int main(int argc, char *argv[]) {
 /*
@@ -600,6 +620,9 @@ int main(int argc, char *argv[]) {
     void *ptr = ((void *) buffer);
     print_pkt(ptr);
 
+    char *src_ip = (char *)malloc(sizeof(struct in_addr)); // src overlay ip
+    char *dst_ip = (char *)malloc(sizeof(struct in_addr)); // dst overlay ip
+
     ((struct iphdr*)ptr)->ttl--;
 
     // drops packet (ignores) and logs when TTL value is zero
@@ -608,6 +631,14 @@ int main(int argc, char *argv[]) {
       free(buffer);
       continue;
     }
+
+    char *next_dest = get_next_hop(dst_ip);
+
+    time_t start, end;
+    double diff;
+    all_routers->send_pkt_last = time(&start);
+
+// set first to -1, if -1, send and update value
 
     // TODO: send packet along to next router
 

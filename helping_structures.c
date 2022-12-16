@@ -93,3 +93,19 @@ char* search_ip(struct Trie_Node *root, char *overlay_ip_addr) {
 
     return last_found_ip;
 }
+
+void get_IP_from_overlay(struct Host_Node *hosts, char *ip, char *ret) {
+    int f = 0;
+
+    while (hosts != NULL) {
+        if (strcmp(ip, hosts->r_addr) == 0) {
+            f = 1;
+            strcpy(ret, hosts->o_addr);
+        }
+        hosts = hosts->next;
+    }
+
+    if (f == 0) {
+        strcpy(ret, "-");
+    }
+}

@@ -4,6 +4,7 @@ int my_port = 5000;
 int my_id = -1;
 char *my_addr;
 char *my_overlay_addr;
+char *my_router_ip;
 int host_flag = 0;
 int router_flag = 0;
 int queue_length = 0;
@@ -18,6 +19,7 @@ struct Queue {
 
 struct Router_Node *all_routers = NULL;
 struct Host_Node *all_hosts = NULL;
+struct Trie_Node *prefix_matching = NULL;
 
 
 int create_socket()
@@ -300,16 +302,30 @@ void do_router_config(char *str) {
 
 void do_host_config(char *str) {
   char delim[] = " ";
-  struct Host_Node *head = all_hosts;
-  while (head != NULL) {
+  struct Host_Node *head;
+  if (all_hosts == NULL) {
+    all_hosts = (struct Host_Node*) (malloc(sizeof(struct Host_Node)));
+    all_hosts->next = NULL;
+    head = all_hosts;
+  } else {
+    head = all_hosts;
+    while (head->next != NULL) {
+      head = head->next;
+    }
+    head->next = (struct Host_Node*) (malloc(sizeof(struct Host_Node)));
     head = head->next;
+    head->next = NULL;
   }
-  head = (struct Host_Node*) (malloc(sizeof(struct Host_Node)));
 
 	char *ptr = strtok(str, delim);
   int pos = 0;
 
 	while (ptr != NULL) {
+    char buffer[strlen(ptr)];
+    strcpy(buffer, ptr);
+    if (pos == 2) {
+      buffer[strcspn(buffer, "\n")-1] = 0;
+    }
     switch (pos) {
       case 0:
         head->id = atoi(ptr);
@@ -319,19 +335,19 @@ void do_host_config(char *str) {
         break;
       case 1:
         if (head->id == my_id) {
-          my_addr = (char *)malloc(sizeof(char)*strlen(ptr));
-          strncpy(my_addr, ptr, strlen(ptr)-2);
+          my_addr = (char *)malloc(sizeof(char)*strlen(buffer));
+          strncpy(my_addr, buffer, strlen(buffer));
         }
-        head->r_addr = (char *)malloc(sizeof(char)*strlen(ptr));
-        strncpy(head->r_addr, ptr, strlen(ptr)-2);
+        head->r_addr = (char *)malloc(sizeof(char)*strlen(buffer));
+        strcpy(head->r_addr, buffer);
         break;
       case 2:
-        if (head->id == my_id) {
-          my_overlay_addr = (char *)malloc(sizeof(char)*strlen(ptr));
-          strncpy(my_overlay_addr, ptr, strlen(ptr)-2);
-        }
-        head->o_addr = (char *)malloc(sizeof(char)*strlen(ptr));
-        strncpy(head->o_addr, ptr, strlen(ptr)-2);
+          if (head->id == my_id) {
+          my_overlay_addr = (char *)malloc(sizeof(char)*strlen(buffer));
+          strncpy(my_overlay_addr, buffer, strlen(buffer));
+          }
+        head->o_addr = (char *)malloc(sizeof(char)*strlen(buffer));
+        strcpy(head->o_addr, buffer);
         break;
     }
     pos++;
@@ -391,10 +407,9 @@ void do_router_link_config(char *str) {
 }
 
 void do_host_link_config(char *str) {
-  if (router_flag == 0) return 0;
   char delim[] = " ";
-  struct Router_Node *head = all_routers;
-
+  struct Host_Node *head_hosts = all_hosts;
+  struct Router_Node *head_routers = all_routers;
 
 	char *ptr = strtok(str, delim);
   int pos = 0;
@@ -414,8 +429,8 @@ void do_host_link_config(char *str) {
           break;
         case 2:
           char *str = strtok(ptr, "/");
-          prefix_addr = (char *)malloc(sizeof(char)*strlen(ptr));
-          strncpy(prefix_addr, ptr, strlen(ptr));
+          prefix_addr = (char *)malloc(sizeof(char)*strlen(str));
+          strcpy(prefix_addr, str);
           break;
         case 3:
           second_id = atoi(ptr);
@@ -429,9 +444,31 @@ void do_host_link_config(char *str) {
   }
 
   if (router_flag == 1 && first_id == my_id) {
-
+    while (head_hosts != NULL) {
+      if (head_hosts->id == second_id) {
+        insert_ip(prefix_matching, head_hosts->o_addr, head_hosts->r_addr);
+        break;
+      }
+    }
   } else if (host_flag == 1 && second_id == my_id) {
-    
+    while (head_routers != NULL) {
+      if (head_routers->id == first_id) {
+        my_router_ip = (char *)(malloc(sizeof(char)*strlen(head_routers->addr)));
+        strcpy(my_router_ip, head_routers->addr);
+        break;
+      }
+    }
+  } else {
+    char *rtr_addr;
+    while (head_routers != NULL) {
+      if (head_routers->id == first_id) {
+        rtr_addr = (char *)(malloc(sizeof(char)*strlen(head_routers->addr)));
+        strcpy(rtr_addr, head_routers->addr);
+        break;
+      }
+    }
+
+    insert_ip(prefix_matching, prefix_addr, rtr_addr);
   }
 }
 
@@ -482,17 +519,6 @@ int main(int argc, char *argv[]) {
     tip.s_addr = (tip.s_addr & SUBNET_MASK(24));
   strcpy(src_ip, inet_ntoa(tip));
   */
-
-  char *addr1 = "10.63.35.1";
-  char *addr2 = "1.2.3.0";
-  char *addr3 = "1.2.3.1";
-  struct Trie_Node *root = create_trie_node();
-  printf("Inserting %s with key %s\n", addr1, addr2);
-  insert_ip(root, addr2, addr1);
-  printf("Searching for %s\n", addr2);
-  char *ret = search_ip(root, addr2);
-  printf("Found %s\n", ret);
-  exit(1);
 
 
 
@@ -591,15 +617,12 @@ int main(int argc, char *argv[]) {
   int count = 0;
   while (host_flag == 1 && count < 1) {
     char *message = "According to all known laws of aviation, there is no way a bee should be able to fly. It's wings are too small to get its fat little body off the ground";
-    void *pkt = generate_packet(message, my_addr, "10.63.35.1", 8135, 8134, strlen(message), 0, ttl_value);
+    void *pkt = generate_packet(message, my_overlay_addr, all_hosts->o_addr, 8135, 8134, strlen(message), 0, ttl_value);
     struct in_addr dest_ip;
     char *some_addr;
-    int val = inet_pton(AF_INET, "10.63.35.1", &dest_ip);
-    printf("Sending :\n");
-    print_pkt(pkt);
+    int val = inet_pton(AF_INET, my_router_ip, &dest_ip);
     int returnVal = send_pkt(sock, (char *)pkt, sizeof(struct ip) + sizeof(struct udphdr) + strlen(message), 8134, dest_ip.s_addr);
     free(pkt);
-    printf("Send %d bytes\n", returnVal);
     count++;
   }
 

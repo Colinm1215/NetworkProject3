@@ -38,5 +38,6 @@ struct Trie_Node {
 struct Trie_Node *create_trie_node();
 void insert_ip(struct Trie_Node *root, char *overlay_ip_addr, char *real_ip_addr);
 char* search_ip(struct Trie_Node *root, char *overlay_ip_addr);
+void getOverlayOfIP(struct Host_Node *hosts, char *overlay_ip, char *ret);
 
 #endif

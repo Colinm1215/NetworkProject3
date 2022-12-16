@@ -14,6 +14,21 @@ struct General_Node {
   struct General_Node *next;
 };
 
+struct Router_Node {
+  char *addr;
+  int id;
+  int delay_with_router;
+  struct Router_Node *next;
+};
+
+struct Host_Node {
+  char *r_addr;
+  char *o_addr;
+  int id;
+  int delay_with_router;
+  struct Host_Node *next;
+};
+
 struct Trie_Node {
   int destination;
   char *real_addr;
@@ -22,6 +37,6 @@ struct Trie_Node {
 
 struct Trie_Node *create_trie_node();
 void insert_ip(struct Trie_Node *root, char *overlay_ip_addr, char *real_ip_addr);
-void search_ip(struct Trie_Node *root, char *overlay_ip_addr, char *ip_return);
+char* search_ip(struct Trie_Node *root, char *overlay_ip_addr);
 
 #endif

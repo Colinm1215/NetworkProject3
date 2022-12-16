@@ -38,11 +38,11 @@ void generate_udp_header(int source_port, int destination_port, int length, void
 void logger(char *src_overlay_ip, char *dst_overlay_ip, int ip_ident, int status_code, char *next_hop_ip);
 void print_pkt(void *pkt);
 void read_configuration_file(FILE* fp);
-int do_global_config(int pos, char *str);
-int do_router_config(int pos, char *str);
-int do_host_config(int pos, char *str);
-int do_router_link_config(int pos, char *str);
-int do_host_link_config(int pos, char *str);
+void do_global_config(char *str);
+void do_router_config(char *str);
+void do_host_config(char *str);
+void do_router_link_config(char *str);
+void do_host_link_config(char *str);
 void* generate_packet(char *body, char *source_addr, char *dest_addr, int source_port, int dest_port, int body_len, int id, int ttl);
 
 

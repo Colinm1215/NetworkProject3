@@ -374,7 +374,7 @@ void do_host_config(char *str) {
 }
 
 void do_router_link_config(char *str) {
-  if (router_flag == 0) return 0;
+  if (router_flag == 0) return;
   char delim[] = " ";
   struct Router_Node *head = all_routers;
 

@@ -20,6 +20,7 @@ struct Queue {
 struct Router_Node *all_routers = NULL;
 struct Host_Node *all_hosts = NULL;
 struct Trie_Node *prefix_matching = NULL;
+struct Queue *queue;
 
 
 int create_socket()
@@ -54,7 +55,7 @@ int recv_pkt(int sock, char *buffer, int buff_size)
   return n;
 }
 
-int send_pkt(int sock, char *buffer, int buff_size, int port, unsigned long nextIP)
+int send_pkt(int sock, char *buffer, int buff_size, unsigned long nextIP)
 {
   struct sockaddr_in to;
   int tolen, n;
@@ -64,7 +65,7 @@ int send_pkt(int sock, char *buffer, int buff_size, int port, unsigned long next
   // Okay, we must populate the to structure.
   bzero(&to, sizeof(to));
   to.sin_family = AF_INET;
-  to.sin_port = htons(port);
+  to.sin_port = htons(my_port);
   to.sin_addr.s_addr = nextIP;
 
   // We can now send to this destination:
@@ -203,7 +204,6 @@ int droptail_dequeue(struct Queue *queue, char *pkt){
   queue->len--;
   return 1; // dequeue successful
 }
-
 
 
 void logger(char *src_overlay_ip, char *dst_overlay_ip, int ip_ident, int status_code, char *next_hop_ip)
@@ -539,8 +539,7 @@ int main(int argc, char *argv[]) {
     tip.s_addr = (tip.s_addr & SUBNET_MASK(24));
   strcpy(src_ip, inet_ntoa(tip));
   */
-
-
+  queue = (struct Queue *) malloc(sizeof(struct Queue));
 
   int opterr = 0;
   int opt;
@@ -623,24 +622,91 @@ int main(int argc, char *argv[]) {
     char *src_ip = (char *)malloc(sizeof(struct in_addr)); // src overlay ip
     char *dst_ip = (char *)malloc(sizeof(struct in_addr)); // dst overlay ip
 
+    strcpy(src_ip, inet_ntoa(((struct ip *)ptr)->ip_src));
+    strcpy(dst_ip, inet_ntoa(((struct ip *)ptr)->ip_dst));
+    int ip_ident = ntohs(((struct ip *)ptr)->ip_id);
+
     ((struct iphdr*)ptr)->ttl--;
 
     // drops packet (ignores) and logs when TTL value is zero
     if(((struct iphdr*)ptr)->ttl == 0){
-      // logger(src_overlay_ip, dst_overlay_ip, ip_ident, TTL_EXPIRED, NULL);
+      logger(src_ip, dst_ip, ip_ident, TTL_EXPIRED, NULL);
       free(buffer);
       continue;
     }
 
-    char *next_dest = get_next_hop(dst_ip);
-
-    time_t start, end;
-    double diff;
-    all_routers->send_pkt_last = time(&start);
+    char *next_dest = search_ip(prefix_matching, dst_ip); // next hop ip
+    if (next_dest == NULL){
+      logger(src_ip, dst_ip, ip_ident, NO_ROUTE_TO_HOST, NULL);
+    }
 
 // set first to -1, if -1, send and update value
+    struct Router_Node *crawl = all_routers;
+    time_t end;
+    time(&end);
+    struct in_addr dest_ip;
+    while (crawl != NULL) {
+      if (strcmp(crawl->addr, next_dest) == 0) {
+        // do router stuff
+        if(crawl->send_pkt_last == -1){
+          //send new pkt right away
+          crawl->send_pkt_last = end; // update last pkt send time
+          int ip_ident = ntohs(((struct ip *)ptr)->ip_id);
+          int val = inet_pton(AF_INET, next_dest, &dest_ip);
+          int returnVal = send_pkt(sock, (char *)ptr, sizeof(struct ip) + sizeof(struct udphdr) + strlen(ptr), dest_ip.s_addr);
+        } else{
+          time_t start = crawl->send_pkt_last;
+          double diff;
+          diff = difftime(end, start);
+          diff = diff*1000; // convert to milliseconds
+          if(diff < crawl->delay_with_router){ // hasn't reached full delay time yet
+            int value = droptail_enqueue(queue, ptr);
+            if(value == 0){
+              logger(src_ip, dst_ip, ip_ident, MAX_SENDQ_EXCEEDED, NULL);
+            } else if (value == 1){
+            void * pkt1 = queue->pkts[queue->head];
+            droptail_dequeue(queue, pkt1);
+            crawl->send_pkt_last = end; // update the last pkt sent time
+            // send pkt1 from queue
+            char *src_ip1 = (char *)malloc(sizeof(struct in_addr)); // src overlay ip
+            char *dst_ip1 = (char *)malloc(sizeof(struct in_addr)); // dst overlay ip
+            strcpy(src_ip1, inet_ntoa(((struct ip *)pkt1)->ip_src));
+            strcpy(dst_ip1, inet_ntoa(((struct ip *)pkt1)->ip_dst));
+            int ip_ident = ntohs(((struct ip *)ptr)->ip_id);
 
+            char *next_dest1 = search_ip(prefix_matching, dst_ip);
+            int val = inet_pton(AF_INET, next_dest, &dest_ip);
+            int returnVal = send_pkt(sock, (char *)pkt1, sizeof(struct ip) + sizeof(struct udphdr) + strlen(pkt1), dest_ip.s_addr);
+            logger(src_ip, dst_ip, ip_ident, SENT_OKAY, next_dest);
+            }
+          } else {
+            // send ptr
+            crawl->send_pkt_last = end; // update the last pkt sent time
+            int ip_ident = ntohs(((struct ip *)ptr)->ip_id);
+            int val = inet_pton(AF_INET, next_dest, &dest_ip);
+            int returnVal = send_pkt(sock, (char *)ptr, sizeof(struct ip) + sizeof(struct udphdr) + strlen(ptr), dest_ip.s_addr);
+            logger(src_ip, dst_ip, ip_ident, SENT_OKAY, next_dest);
+          }
+
+        }
+        
+        break;
+      }
+      crawl = crawl->next;
+    }
+    
+    if (crawl == NULL) {
+      struct Host_Node *host_crawl = all_hosts;
+      while (host_crawl != NULL) {
+        if (strcmp(host_crawl->r_addr, next_dest) == 0) {
+          // do host stuff
+
+
+        }
+      }
+    }
     // TODO: send packet along to next router
+    // crawl->send_pkt_last = end;
 
     free(buffer);
   }
@@ -650,9 +716,8 @@ int main(int argc, char *argv[]) {
     char *message = "According to all known laws of aviation, there is no way a bee should be able to fly. It's wings are too small to get its fat little body off the ground";
     void *pkt = generate_packet(message, my_overlay_addr, all_hosts->o_addr, 8135, 8134, strlen(message), 0, ttl_value);
     struct in_addr dest_ip;
-    char *some_addr;
     int val = inet_pton(AF_INET, my_router_ip, &dest_ip);
-    int returnVal = send_pkt(sock, (char *)pkt, sizeof(struct ip) + sizeof(struct udphdr) + strlen(message), 8134, dest_ip.s_addr);
+    int returnVal = send_pkt(sock, (char *)pkt, sizeof(struct ip) + sizeof(struct udphdr) + strlen(message), dest_ip.s_addr);
     free(pkt);
     count++;
   }

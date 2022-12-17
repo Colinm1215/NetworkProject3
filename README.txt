@@ -16,4 +16,4 @@ Resources Used
 main.c
 -----------
 To run the main.c file, first use the command 'make all' to compile.
-Then, use the command './main []' and .
+Then, use the command './main -i [machine id] -f [config file]'.

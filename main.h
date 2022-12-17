@@ -32,7 +32,7 @@
 int create_socket();
 int main(int argc, char *argv[]);
 int recv_pkt(int sock, char *buffer, int buff_size);
-int send_pkt(int sock, char *buffer, int buff_size, int port, unsigned long nextIP);
+int send_pkt(int sock, char *buffer, int buff_size, unsigned long nextIP);
 void generate_ip_header(char *src_addr, char *dst_addr, int length, int id, int ttl, void *start_of_ip_hdr);
 void generate_udp_header(int source_port, int destination_port, int length, void *start_of_udp_hdr);
 void logger(char *src_overlay_ip, char *dst_overlay_ip, int ip_ident, int status_code, char *next_hop_ip);
